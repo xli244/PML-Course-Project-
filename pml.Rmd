@@ -76,3 +76,5 @@ The SVM model gives an avg test accuracy of 0.9411.
 fit_svm<-svm(classe~.,data=training)
 confusionMatrix(predict(fit_svm,testing),testing$classe)
 ```
+## Conclusion 
+Based on the test accuracy of each model, I decided to choose the random forest model without PCA preprocessing (Model #2). 
