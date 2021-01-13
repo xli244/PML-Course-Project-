@@ -1,0 +1,78 @@
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE)
+```
+
+## R Markdown
+
+
+```{r cars}
+library("caret")
+library("e1071")
+library("parallel")
+library("doParallel")
+set.seed(420)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+data<-read.csv("pml-training.csv",na.strings = c("","NA"))
+data$classe<-as.factor(data$classe)
+data<-data[,8:160]
+data<-data[,which(colMeans(!is.na(data)) > 0.85)]
+intrain<-createDataPartition(y=data$classe,p=0.75,list=FALSE)
+training<-data[intrain,]
+testing<-data[-intrain,]            
+```
+
+Model #1: K Nearest Neighbor (KNN)
+The data is preprocessed with the PCA method before the model fitting. The KNN model gives an avg training accuracy of 0.9576, and avg test accuracy of 0.9582.
+```{r}
+fit_knn<-train(classe~.,data=training,method="knn",preProcess=c("pca"),trControl=trainControl(method="cv",number=10))
+confusionMatrix.train(fit_knn)
+confusionMatrix(predict(fit_knn,testing),testing$classe)
+```
+
+Model #2: Random Forest
+The random forest model gives an avg training accuracy of 0.9918, and avg test accuracy of 0.9925.
+```{r}
+cluster <- makeCluster(detectCores() - 1)
+registerDoParallel(cluster)
+fit_rf<-train(classe~.,method="rf",data=training,trControl=trainControl(method="cv",number=5,allowParallel = TRUE))
+fit_rfpca<-train(classe~.,method="rf",data=training,preProcessing=c("pca"),trControl=trainControl(method="cv",number=5,allowParallel = TRUE))
+stopCluster(cluster)
+registerDoSEQ()
+pred_rf<-predict(fit_rf,testing)
+confusionMatrix.train(fit_rf)
+confusionMatrix(pred_rf,testing$classe)
+```
+
+Model #3: Boosting
+The boosting model gives an avg training accuracy of 0.9624, and avg test accuracy of 0.9594.
+```{r}
+fit_gbm<-train(classe~.,method="gbm",data=training,trControl=trainControl(method="cv",number=5))
+pred_gbm<-predict(fit_gbm,testing)
+confusionMatrix.train(fit_gbm)
+confusionMatrix(pred_gbm,testing$classe)
+```
+
+Model #3 & #4 Trees with combined predictors
+The third and fourth models ensemble two different learning methods, random forest and boosting. Model #3 uses boosting after ensembling and Model #4 uses random forest. Both models have an avg test accuracy of 0.9925.
+```{r}
+stack<-data.frame(pred_rf,pred_gbm,classe=testing$classe)
+fit_comb1<-train(classe~.,data=stack,method="gbm")
+fit_comb2<-train(classe~.,data=stack,method="rf",trControl=trainControl(method="cv",number=5,allowParallel = TRUE))
+confusionMatrix(predict(fit_comb1,testing),testing$classe)   
+confusionMatrix(predict(fit_comb2,testing),testing$classe)    
+```
+
+Model#5: SVM 
+The SVM model gives an avg test accuracy of 0.9411.
+```{r}
+fit_svm<-svm(classe~.,data=training)
+confusionMatrix(predict(fit_svm,testing),testing$classe)
+```
